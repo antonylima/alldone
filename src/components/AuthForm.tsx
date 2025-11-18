@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, Mail } from 'lucide-react';
 
 interface AuthFormProps {
   onAuthSuccess: () => void;
@@ -8,31 +8,42 @@ interface AuthFormProps {
 
 export function AuthForm({ onAuthSuccess }: AuthFormProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        setSuccess('Password reset link has been sent to your email!');
+        setEmail('');
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        onAuthSuccess();
       } else {
         const { error } = await supabase.auth.signUp({
           email,
           password,
         });
         if (error) throw error;
+        onAuthSuccess();
       }
-      onAuthSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -45,7 +56,9 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-            {isLogin ? (
+            {isForgotPassword ? (
+              <Mail className="w-8 h-8 text-white" />
+            ) : isLogin ? (
               <LogIn className="w-8 h-8 text-white" />
             ) : (
               <UserPlus className="w-8 h-8 text-white" />
@@ -53,13 +66,23 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
           </div>
           <h1 className="text-3xl font-bold text-gray-800">Task Manager</h1>
           <p className="text-gray-600 mt-2">
-            {isLogin ? 'Sign in to your account' : 'Create a new account'}
+            {isForgotPassword
+              ? 'Reset your password'
+              : isLogin
+              ? 'Sign in to your account'
+              : 'Create a new account'}
           </p>
         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+            {success}
           </div>
         )}
 
@@ -79,40 +102,69 @@ export function AuthForm({ onAuthSuccess }: AuthFormProps) {
             />
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              placeholder="••••••••"
-              required
-              minLength={6}
-            />
-          </div>
+          {!isForgotPassword && (
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Sign Up'}
+            {loading
+              ? 'Please wait...'
+              : isForgotPassword
+              ? 'Send Reset Link'
+              : isLogin
+              ? 'Sign In'
+              : 'Sign Up'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-2">
+          {!isForgotPassword && isLogin && (
+            <button
+              onClick={() => {
+                setIsForgotPassword(true);
+                setError('');
+                setSuccess('');
+              }}
+              className="block w-full text-blue-600 hover:text-blue-700 text-sm font-medium"
+            >
+              Forgot password?
+            </button>
+          )}
           <button
             onClick={() => {
-              setIsLogin(!isLogin);
+              if (isForgotPassword) {
+                setIsForgotPassword(false);
+              } else {
+                setIsLogin(!isLogin);
+              }
               setError('');
+              setSuccess('');
             }}
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            {isForgotPassword
+              ? 'Back to sign in'
+              : isLogin
+              ? "Don't have an account? Sign up"
+              : 'Already have an account? Sign in'}
           </button>
         </div>
       </div>
