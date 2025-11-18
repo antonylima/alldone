@@ -3,6 +3,7 @@ import { Plus, Database, LogOut, ListTodo } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { taskService } from './services/taskService';
 import { AuthForm } from './components/AuthForm';
+import { PasswordReset } from './components/PasswordReset';
 import { TaskForm } from './components/TaskForm';
 import { TaskList } from './components/TaskList';
 import { BackupManager } from './components/BackupManager';
@@ -16,6 +17,7 @@ function App() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showBackupManager, setShowBackupManager] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -25,10 +27,12 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      (() => {
-        setUser(session?.user ?? null);
-      })();
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResettingPassword(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -108,6 +112,11 @@ function App() {
     setEditingTask(null);
   };
 
+  const handlePasswordResetSuccess = async () => {
+    setIsResettingPassword(false);
+    await loadTasks();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -118,6 +127,10 @@ function App() {
 
   if (!user) {
     return <AuthForm onAuthSuccess={loadTasks} />;
+  }
+
+  if (isResettingPassword) {
+    return <PasswordReset onSuccess={handlePasswordResetSuccess} />;
   }
 
   const urgentCount = tasks.filter(t => t.is_urgent && !t.is_completed).length;
